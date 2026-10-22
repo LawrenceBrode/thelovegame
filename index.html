@@ -1,0 +1,1844 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Laura & Mio baby♡ - 3D Life Sim 2.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js & OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            box-sizing: border-box;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Fredoka', sans-serif;
+            background-color: #87CEEB;
+            touch-action: none;
+        }
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .interactive-ui {
+            pointer-events: auto;
+        }
+        /* Targhette Nomi Fluttuanti */
+        .nameplate {
+            position: absolute;
+            transform: translate(-50%, -100%);
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-weight: 700;
+            font-size: 12px;
+            white-space: nowrap;
+            pointer-events: auto;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.28);
+            transition: transform 0.15s ease;
+            border: 2px solid rgba(255,255,255,0.9);
+            backdrop-filter: blur(4px);
+        }
+        .nameplate:active {
+            transform: translate(-50%, -100%) scale(0.92);
+        }
+        .pet-plate {
+            font-size: 11px;
+            padding: 2px 8px;
+            opacity: 0.92;
+            pointer-events: none;
+        }
+        /* Fumetti Dialoghi & Cuoricini Fluttuanti */
+        .speech-bubble {
+            position: absolute;
+            transform: translate(-50%, -100%);
+            background: rgba(255, 255, 255, 0.96);
+            color: #1e293b;
+            padding: 6px 13px;
+            border-radius: 18px;
+            font-size: 12px;
+            font-weight: 700;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+            border: 2.5px solid #ec4899;
+            white-space: nowrap;
+            pointer-events: none;
+            z-index: 25;
+            animation: bubblePop 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+        }
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -7px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 7px 6px 0;
+            border-style: solid;
+            border-color: #ec4899 transparent;
+        }
+        @keyframes bubblePop {
+            from { opacity: 0; transform: translate(-50%, -65%) scale(0.75); }
+            to { opacity: 1; transform: translate(-50%, -100%) scale(1); }
+        }
+        /* Effetto Censura Pixelata Bagno */
+        #censor-overlay {
+            position: absolute;
+            pointer-events: none;
+            display: none;
+            width: 145px;
+            height: 145px;
+            transform: translate(-50%, -50%);
+            z-index: 20;
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow: 0 0 25px rgba(0,0,0,0.4);
+            border: 3px solid rgba(255,255,255,0.75);
+        }
+        .glass-dark {
+            background: rgba(20, 20, 35, 0.80);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1.5px solid rgba(255, 255, 255, 0.22);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.35);
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+        }
+        .btn-bounce {
+            transition: transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .btn-bounce:active {
+            transform: scale(0.91);
+        }
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            height: 7px;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #ff9a9e 0%, #a1c4fd 45%, #fda085 75%, #1e293b 100%);
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #ffffff;
+            border: 3px solid #ec4899;
+            margin-top: -5.5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Container WebGL Three.js -->
+    <div id="canvas-container"></div>
+
+    <!-- Container Targhette Nomi, Fumetti e Censura Bagno -->
+    <div id="labels-container" class="absolute inset-0 pointer-events-none overflow-hidden" style="z-index: 12;">
+        <div id="label-laura" class="nameplate bg-pink-500/90 text-white" onclick="openCharacterMenu('laura')">🌸 Laura</div>
+        <div id="label-baby" class="nameplate bg-blue-600/90 text-white" onclick="openCharacterMenu('baby')">🕶️ Mio baby♡</div>
+        <div id="label-neve" class="nameplate pet-plate bg-white/95 text-slate-800">🐱 Neve</div>
+        <div id="label-pepe" class="nameplate pet-plate bg-amber-900/90 text-amber-50">🐶 Pepe</div>
+        <div id="label-f15" class="nameplate pet-plate bg-slate-800/85 text-sky-300 border-sky-400/50">✈️ F-15 Eagle</div>
+
+        <!-- Overlay Censura Pixelata per i 3s del Bagno -->
+        <div id="censor-overlay">
+            <canvas id="censor-canvas" width="14" height="14" class="w-full h-full" style="image-rendering: pixelated;"></canvas>
+            <div class="absolute inset-0 flex items-center justify-center">
+                <span class="bg-black/75 text-white text-xs px-2.5 py-1 rounded-full font-bold shadow">🙈 PRIVACY 3s!</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Interfaccia Utente Mobile-First -->
+    <div id="ui-layer" class="p-2.5 sm:p-4">
+
+        <!-- BARRA SUPERIORE: Stato Attuale, Personaggi e Controllo Cielo -->
+        <div class="flex flex-col gap-2 w-full max-w-xl mx-auto">
+            <div class="flex items-center justify-between gap-2">
+                <!-- Pill Stato -->
+                <div class="glass-dark text-white px-3 py-1.5 rounded-2xl flex items-center gap-2 interactive-ui flex-1 min-w-0">
+                    <span id="status-icon" class="text-lg animate-pulse shrink-0">💖</span>
+                    <div class="truncate">
+                        <div class="text-[9px] uppercase tracking-wider text-pink-300 font-bold">Laura & Mio baby♡</div>
+                        <div id="status-text" class="text-xs sm:text-sm font-bold truncate">Vita Autonoma AFK ♡</div>
+                    </div>
+                </div>
+
+                <!-- Selezione Rapida Personaggi -->
+                <div class="flex gap-1.5 interactive-ui shrink-0">
+                    <button onclick="openCharacterMenu('laura')" class="btn-bounce bg-gradient-to-b from-pink-400 to-pink-600 text-white px-3 py-2 rounded-2xl font-bold text-xs shadow-lg border-2 border-pink-200 flex items-center gap-1">
+                        <span>🌸</span><span>Laura</span>
+                    </button>
+                    <button onclick="openCharacterMenu('baby')" class="btn-bounce bg-gradient-to-b from-blue-500 to-indigo-700 text-white px-3 py-2 rounded-2xl font-bold text-xs shadow-lg border-2 border-blue-200 flex items-center gap-1">
+                        <span>🕶️</span><span>Mio baby♡</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Barra Ciclo Giorno/Notte & Telecamera -->
+            <div class="glass-dark text-white px-3 py-1.5 rounded-2xl flex items-center gap-2.5 interactive-ui">
+                <button id="btn-auto-time" onclick="toggleAutoTime()" class="btn-bounce bg-pink-500 text-white text-[11px] font-bold px-2.5 py-1 rounded-xl border border-pink-300 shrink-0">
+                    ⏱️ Auto: ON
+                </button>
+                <span id="time-label" class="text-xs font-bold w-24 shrink-0 text-amber-200">☀️ Giorno</span>
+                <input id="time-slider" type="range" min="0" max="24" step="0.1" value="11" class="w-full cursor-pointer" oninput="onManualTimeChange(this.value)">
+                <button onclick="focusJetView()" class="btn-bounce bg-sky-500/30 hover:bg-sky-500/50 border border-sky-300/40 text-white text-[11px] font-bold px-2 py-1 rounded-xl shrink-0" title="Guarda F-15">
+                    ✈️ F-15
+                </button>
+                <button onclick="resetCameraView()" class="btn-bounce bg-white/15 hover:bg-white/25 text-white text-xs px-2 py-1 rounded-xl shrink-0" title="Centra Casa">
+                    🏡
+                </button>
+            </div>
+        </div>
+
+        <!-- MENU AZIONI PERSONALI (Pop-up Centrale) -->
+        <div class="flex items-center justify-center my-auto pointer-events-none">
+            <!-- Menu Laura -->
+            <div id="menu-laura" class="hidden glass-panel p-4 rounded-3xl w-72 sm:w-80 interactive-ui border-4 border-pink-300">
+                <div class="flex justify-between items-center mb-3">
+                    <div class="flex items-center gap-2">
+                        <div class="w-9 h-9 rounded-2xl bg-pink-500 flex items-center justify-center text-white text-lg shadow">🌸</div>
+                        <div>
+                            <h3 class="font-bold text-slate-800 text-base leading-tight">Laura</h3>
+                            <p class="text-[11px] text-pink-600 font-semibold">Scegli cosa farle fare ♡</p>
+                        </div>
+                    </div>
+                    <button onclick="closeCharacterMenus()" class="w-8 h-8 rounded-full bg-slate-200 text-slate-700 font-bold text-sm btn-bounce">✕</button>
+                </div>
+                <div class="grid grid-cols-1 gap-2">
+                    <button onclick="startPersonalAction('bacia')" class="btn-bounce bg-gradient-to-r from-pink-500 to-rose-500 text-white py-2.5 px-4 rounded-2xl font-bold text-sm shadow flex items-center justify-between">
+                        <span>💋 1. Bacia</span>
+                        <span class="text-[11px] bg-white/25 px-2 py-0.5 rounded-full">1s + Cuori</span>
+                    </button>
+                    <button onclick="startPersonalAction('mangia')" class="btn-bounce bg-gradient-to-r from-rose-600 to-red-600 text-white py-2.5 px-4 rounded-2xl font-bold text-sm shadow flex items-center justify-between">
+                        <span>🔥 2. Mangia</span>
+                        <span class="text-[11px] bg-white/25 px-2 py-0.5 rounded-full">Bacio 3s (+2s)</span>
+                    </button>
+                    <button onclick="startPersonalAction('bacino')" class="btn-bounce bg-gradient-to-r from-amber-400 to-pink-500 text-white py-2.5 px-4 rounded-2xl font-bold text-sm shadow flex items-center justify-between">
+                        <span>🥰 3. Bacino</span>
+                        <span class="text-[11px] bg-white/25 px-2 py-0.5 rounded-full">Sulla guancia</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Menu Mio baby♡ -->
+            <div id="menu-baby" class="hidden glass-panel p-4 rounded-3xl w-72 sm:w-80 interactive-ui border-4 border-blue-300">
+                <div class="flex justify-between items-center mb-3">
+                    <div class="flex items-center gap-2">
+                        <div class="w-9 h-9 rounded-2xl bg-blue-600 flex items-center justify-center text-white text-lg shadow">🕶️</div>
+                        <div>
+                            <h3 class="font-bold text-slate-800 text-base leading-tight">Mio baby♡</h3>
+                            <p class="text-[11px] text-blue-600 font-semibold">Ti ama tantissimo ♡</p>
+                        </div>
+                    </div>
+                    <button onclick="closeCharacterMenus()" class="w-8 h-8 rounded-full bg-slate-200 text-slate-700 font-bold text-sm btn-bounce">✕</button>
+                </div>
+                <div class="grid grid-cols-1 gap-2">
+                    <button onclick="startPersonalAction('bacia')" class="btn-bounce bg-gradient-to-r from-pink-500 to-rose-500 text-white py-2.5 px-4 rounded-2xl font-bold text-sm shadow flex items-center justify-between">
+                        <span>💋 1. Bacia</span>
+                        <span class="text-[11px] bg-white/25 px-2 py-0.5 rounded-full">1s + Cuori</span>
+                    </button>
+                    <button onclick="startPersonalAction('mangia')" class="btn-bounce bg-gradient-to-r from-rose-600 to-red-600 text-white py-2.5 px-4 rounded-2xl font-bold text-sm shadow flex items-center justify-between">
+                        <span>🔥 2. Mangia</span>
+                        <span class="text-[11px] bg-white/25 px-2 py-0.5 rounded-full">Bacio 3s (+2s)</span>
+                    </button>
+                    <button onclick="startPersonalAction('tuff')" class="btn-bounce bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-2.5 px-4 rounded-2xl font-bold text-sm shadow flex items-center justify-between">
+                        <span>🕺 3. Tuff</span>
+                        <span class="text-[11px] bg-white/25 px-2 py-0.5 rounded-full">Mossa di Ballo</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- BARRA INFERIORE: Trigger Stanze & Postazione PC -->
+        <div class="w-full max-w-xl mx-auto">
+            <div class="glass-dark p-2 rounded-3xl interactive-ui">
+                <div class="text-center text-[10px] text-pink-200 font-semibold mb-1.5 tracking-wide">
+                    🏡 STANZE INTERATTIVE (I muri davanti alla visuale spariscono da soli!)
+                </div>
+                <div class="grid grid-cols-6 gap-1.5">
+                    <button onclick="triggerRoom('kitchen')" class="btn-bounce bg-gradient-to-b from-amber-400 to-orange-500 text-white py-2 px-1 rounded-2xl font-bold text-[11px] flex flex-col items-center justify-center shadow border border-amber-200">
+                        <span class="text-base">🍔🧋</span>
+                        <span>Cucina</span>
+                    </button>
+                    <button onclick="triggerRoom('living')" class="btn-bounce bg-gradient-to-b from-emerald-400 to-green-600 text-white py-2 px-1 rounded-2xl font-bold text-[11px] flex flex-col items-center justify-center shadow border border-emerald-200">
+                        <span class="text-base">🛋️📺</span>
+                        <span>Salotto</span>
+                    </button>
+                    <button onclick="triggerRoom('bedroom')" class="btn-bounce bg-gradient-to-b from-purple-500 to-pink-600 text-white py-2 px-1 rounded-2xl font-bold text-[11px] flex flex-col items-center justify-center shadow border border-purple-200">
+                        <span class="text-base">🛏️💤</span>
+                        <span>Camera</span>
+                    </button>
+                    <button onclick="triggerRoom('bathroom')" class="btn-bounce bg-gradient-to-b from-cyan-400 to-teal-600 text-white py-2 px-1 rounded-2xl font-bold text-[11px] flex flex-col items-center justify-center shadow border border-cyan-200">
+                        <span class="text-base">🚿🙈</span>
+                        <span>Bagno</span>
+                    </button>
+                    <button onclick="triggerRoom('pc')" class="btn-bounce bg-gradient-to-b from-fuchsia-500 to-indigo-600 text-white py-2 px-1 rounded-2xl font-bold text-[11px] flex flex-col items-center justify-center shadow border border-fuchsia-200">
+                        <span class="text-base">💻✨</span>
+                        <span>PC Desk</span>
+                    </button>
+                    <button onclick="triggerRoom('afk')" class="btn-bounce bg-gradient-to-b from-slate-500 to-slate-700 text-white py-2 px-1 rounded-2xl font-bold text-[11px] flex flex-col items-center justify-center shadow border border-slate-300">
+                        <span class="text-base">🚶‍♂️💖</span>
+                        <span>AFK</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // ============================================================================
+        // 1. INIZIALIZZAZIONE SCENA, CAMERA, LUCI E CONTROLLI
+        // ============================================================================
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB);
+        scene.fog = new THREE.FogExp2(0x87CEEB, 0.0045);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 400);
+        camera.position.set(0, 25, 34);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.07;
+        controls.target.set(0, 2, 0);
+        controls.maxPolarAngle = Math.PI / 2 - 0.05;
+        controls.minDistance = 10;
+        controls.maxDistance = 85;
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.68);
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xfff5e6, 0.95);
+        sunLight.position.set(25, 42, 22);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        sunLight.shadow.camera.near = 5;
+        sunLight.shadow.camera.far = 130;
+        const d = 38;
+        sunLight.shadow.camera.left = -d;
+        sunLight.shadow.camera.right = d;
+        sunLight.shadow.camera.top = d;
+        sunLight.shadow.camera.bottom = -d;
+        sunLight.shadow.bias = -0.0005;
+        scene.add(sunLight);
+
+        // Luci calde interne della casa per il Tramonto e la Notte
+        const houseLights = [];
+        function addHouseWarmLight(x, y, z) {
+            const pl = new THREE.PointLight(0xffaa55, 0, 16);
+            pl.position.set(x, y, z);
+            scene.add(pl);
+            houseLights.push(pl);
+        }
+        addHouseWarmLight(-5.5, 4.8, -4.5);
+        addHouseWarmLight(5.5, 4.8, -4.5);
+        addHouseWarmLight(-5.5, 4.8, 4.5);
+        addHouseWarmLight(5.5, 4.8, 4.5);
+
+        // Luce RGB Postazione PC & Luce TV
+        const pcRgbLight = new THREE.PointLight(0xff00ff, 1.1, 6);
+        pcRgbLight.position.set(8.6, 2.5, -2.2);
+        scene.add(pcRgbLight);
+
+        const tvLight = new THREE.PointLight(0x44aaff, 0, 8);
+        tvLight.position.set(-5.5, 2.2, 8.0);
+        scene.add(tvLight);
+
+        function resetCameraView() {
+            camera.position.set(0, 25, 34);
+            controls.target.set(0, 2, 0);
+            controls.update();
+        }
+
+        function focusJetView() {
+            camera.position.set(34, 14, 24);
+            controls.target.set(25, 2.2, 2);
+            controls.update();
+        }
+
+        // ============================================================================
+        // 2. GIARDINO, MONTAGNE INNEVATE E CACCIA F-15 EAGLE IN SCALA REALE
+        // ============================================================================
+        const envGroup = new THREE.Group();
+        scene.add(envGroup);
+
+        // Grande Prato Verde
+        const grassMesh = new THREE.Mesh(
+            new THREE.PlaneGeometry(240, 240),
+            new THREE.MeshStandardMaterial({ color: 0x62bd52, roughness: 0.9 })
+        );
+        grassMesh.rotation.x = -Math.PI / 2;
+        grassMesh.receiveShadow = true;
+        envGroup.add(grassMesh);
+
+        // Vialetto d'ingresso in pietra fuori dalla casa
+        const stoneMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.8 });
+        for (let i = 0; i < 6; i++) {
+            const step = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.08, 1.1), stoneMat);
+            step.position.set(0, 0.04, 10.8 + i * 1.65);
+            step.receiveShadow = true;
+            envGroup.add(step);
+        }
+
+        // Piazzola Tarmac nel giardino a destra per l'F-15 Eagle
+        const tarmac = new THREE.Mesh(
+            new THREE.BoxGeometry(22, 0.1, 28),
+            new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.75 })
+        );
+        tarmac.position.set(25, 0.05, 2);
+        tarmac.receiveShadow = true;
+        envGroup.add(tarmac);
+
+        const stripe = new THREE.Mesh(
+            new THREE.BoxGeometry(0.35, 0.12, 24),
+            new THREE.MeshBasicMaterial({ color: 0xfacc15 })
+        );
+        stripe.position.set(25, 0.06, 2);
+        envGroup.add(stripe);
+
+        // --- MODELLO 3D CACCIA F-15 EAGLE (Static Prop in Scala Realistica) ---
+        function buildF15Eagle() {
+            const f15 = new THREE.Group();
+            const tacGrey = new THREE.MeshStandardMaterial({ color: 0x7c858e, roughness: 0.45, metalness: 0.35 });
+            const darkGrey = new THREE.MeshStandardMaterial({ color: 0x383d42, roughness: 0.5, metalness: 0.4 });
+            const canopyMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.1, metalness: 0.85, transparent: true, opacity: 0.84 });
+            const exhaustMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.3, metalness: 0.8 });
+
+            // Fusoliera principale
+            const body = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.35, 14.5), tacGrey);
+            body.position.set(0, 1.9, 0);
+            body.castShadow = true;
+            f15.add(body);
+
+            // Radome / Muso conico anteriore
+            const nose = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.95, 5.5, 8), darkGrey);
+            nose.rotation.x = Math.PI / 2;
+            nose.position.set(0, 1.8, 9.8);
+            nose.castShadow = true;
+            f15.add(nose);
+
+            // Prese d'aria laterali (Intakes)
+            [-1.55, 1.55].forEach(xPos => {
+                const intake = new THREE.Mesh(new THREE.BoxGeometry(0.95, 1.25, 9.5), tacGrey);
+                intake.position.set(xPos, 1.85, -1.2);
+                intake.castShadow = true;
+                f15.add(intake);
+
+                const hole = new THREE.Mesh(new THREE.BoxGeometry(0.75, 1.0, 0.2), exhaustMat);
+                hole.position.set(xPos, 1.85, 3.55);
+                f15.add(hole);
+            });
+
+            // Cockpit in vetro scuro
+            const canopy = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.95, 4.8), canopyMat);
+            canopy.position.set(0, 2.8, 4.2);
+            f15.add(canopy);
+
+            // Ali a freccia, Piani di coda, Doppia Deriva Verticale e Doppio Motore
+            [-1, 1].forEach(dir => {
+                const wing = new THREE.Mesh(new THREE.BoxGeometry(8.5, 0.22, 5.8), tacGrey);
+                wing.position.set(dir * 5.2, 2.05, -1.8);
+                wing.rotation.y = dir * -0.28;
+                wing.castShadow = true;
+                f15.add(wing);
+
+                const tailWing = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.18, 3.0), darkGrey);
+                tailWing.position.set(dir * 2.8, 1.9, -7.2);
+                tailWing.rotation.y = dir * -0.32;
+                tailWing.castShadow = true;
+                f15.add(tailWing);
+
+                // Doppia coda verticale F-15
+                const vTail = new THREE.Mesh(new THREE.BoxGeometry(0.24, 3.4, 3.6), tacGrey);
+                vTail.position.set(dir * 1.45, 3.6, -6.2);
+                vTail.rotation.x = -0.18;
+                vTail.castShadow = true;
+                f15.add(vTail);
+
+                const tailTip = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.45, 3.4), darkGrey);
+                tailTip.position.set(dir * 1.45, 5.1, -6.4);
+                f15.add(tailTip);
+
+                // Ugelli postbruciatore
+                const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.68, 0.58, 1.6, 12), exhaustMat);
+                nozzle.rotation.x = Math.PI / 2;
+                nozzle.position.set(dir * 0.72, 1.85, -7.8);
+                f15.add(nozzle);
+
+                // Missili decorativi sotto le ali
+                const missile = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 3.4, 8), new THREE.MeshStandardMaterial({ color: 0xf8fafc }));
+                missile.rotation.x = Math.PI / 2;
+                missile.position.set(dir * 4.2, 1.65, -1.2);
+                f15.add(missile);
+            });
+
+            // Carrelli d'atterraggio
+            const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+            const strutMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0 });
+            [[0, 6.2], [-1.8, -2.2], [1.8, -2.2]].forEach(([wx, wz]) => {
+                const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 1.3), strutMat);
+                strut.position.set(wx, 1.1, wz);
+                f15.add(strut);
+                const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.35, 12), wheelMat);
+                wheel.rotation.z = Math.PI / 2;
+                wheel.position.set(wx, 0.45, wz);
+                f15.add(wheel);
+            });
+
+            f15.position.set(25, 0.1, 2);
+            f15.rotation.y = -0.35;
+            envGroup.add(f15);
+            return f15;
+        }
+        const f15Jet = buildF15Eagle();
+
+        // --- CATENA MONTUOSA CON CIME INNEVATE ---
+        function buildMountains() {
+            const rockMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.9, flatShading: true });
+            const snowMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.6, flatShading: true });
+            const numMountains = 28;
+            const radius = 82;
+
+            for (let i = 0; i < numMountains; i++) {
+                const angle = (i / numMountains) * Math.PI * 2;
+                const isFront = Math.sin(angle) > 0.65 && Math.abs(Math.cos(angle)) < 0.5;
+                const height = isFront ? 9 + Math.random() * 5 : 24 + Math.random() * 24;
+                const baseRad = 12 + Math.random() * 10;
+
+                const mGroup = new THREE.Group();
+                const rock = new THREE.Mesh(new THREE.ConeGeometry(baseRad, height, 6), rockMat);
+                rock.position.y = height / 2;
+                mGroup.add(rock);
+
+                if (height > 18) {
+                    const capHeight = height * 0.36;
+                    const capRad = baseRad * 0.365;
+                    const snow = new THREE.Mesh(new THREE.ConeGeometry(capRad, capHeight, 6), snowMat);
+                    snow.position.y = height - capHeight / 2 + 0.05;
+                    mGroup.add(snow);
+                }
+
+                const dist = radius + (Math.random() - 0.5) * 16;
+                mGroup.position.set(Math.cos(angle) * dist, -0.5, Math.sin(angle) * dist);
+                mGroup.rotation.y = Math.random() * Math.PI;
+                envGroup.add(mGroup);
+            }
+        }
+        buildMountains();
+
+        // Alberi e fiorellini nel giardino
+        function buildGardenTreesAndFlowers() {
+            const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6e472b });
+            const leavesMat = new THREE.MeshStandardMaterial({ color: 0x388e3c });
+            const coords = [[-18, -14], [-21, 3], [-16, 15], [13, -18], [-8, -20], [10, 17], [38, -14], [38, 15]];
+            coords.forEach(([tx, tz]) => {
+                const tree = new THREE.Group();
+                const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.55, 2.5, 7), trunkMat);
+                trunk.position.y = 1.25;
+                trunk.castShadow = true;
+                const f1 = new THREE.Mesh(new THREE.ConeGeometry(2.2, 3.8, 7), leavesMat);
+                f1.position.y = 3.5;
+                f1.castShadow = true;
+                const f2 = new THREE.Mesh(new THREE.ConeGeometry(1.6, 3.0, 7), leavesMat);
+                f2.position.y = 5.2;
+                f2.castShadow = true;
+                tree.add(trunk, f1, f2);
+                tree.position.set(tx, 0, tz);
+                envGroup.add(tree);
+            });
+
+            const flowerColors = [0xff6b8b, 0xffd166, 0xc77dff, 0xffffff];
+            for (let i = 0; i < 45; i++) {
+                const fx = (Math.random() - 0.5) * 55;
+                const fz = (Math.random() - 0.5) * 55;
+                if (Math.abs(fx) < 13 && Math.abs(fz) < 12) continue;
+                if (fx > 12 && fx < 37 && Math.abs(fz) < 17) continue;
+                const fl = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.35, 0.35, 0.35),
+                    new THREE.MeshStandardMaterial({ color: flowerColors[i % flowerColors.length] })
+                );
+                fl.position.set(fx, 0.2, fz);
+                envGroup.add(fl);
+            }
+        }
+        buildGardenTreesAndFlowers();
+
+        // ============================================================================
+        // 3. LA CASA ESPANSA & DYNAMIC WALL CULLING (Muri a Scomparsa Automatica)
+        // ============================================================================
+        const houseGroup = new THREE.Group();
+        scene.add(houseGroup);
+
+        const HOUSE_W = 22;
+        const HOUSE_D = 19;
+        const WALL_H = 5.4;
+
+        // Pavimento base legno caldo
+        const floorBase = new THREE.Mesh(
+            new THREE.BoxGeometry(HOUSE_W, 0.3, HOUSE_D),
+            new THREE.MeshStandardMaterial({ color: 0xc89058, roughness: 0.7 })
+        );
+        floorBase.position.y = 0.15;
+        floorBase.receiveShadow = true;
+        houseGroup.add(floorBase);
+
+        // Pavimento Cucina crema chiaro (Nord-Ovest)
+        const kitchenFloor = new THREE.Mesh(
+            new THREE.BoxGeometry(10.6, 0.04, 9.1),
+            new THREE.MeshStandardMaterial({ color: 0xf5ebd6, roughness: 0.5 })
+        );
+        kitchenFloor.position.set(-5.3, 0.32, -4.55);
+        kitchenFloor.receiveShadow = true;
+        houseGroup.add(kitchenFloor);
+
+        // Pavimento Bagno azzurro chiaro (Sud-Est)
+        const bathFloor = new THREE.Mesh(
+            new THREE.BoxGeometry(10.6, 0.04, 9.1),
+            new THREE.MeshStandardMaterial({ color: 0xdcfce7, roughness: 0.3 })
+        );
+        bathFloor.position.set(5.3, 0.32, 4.55);
+        bathFloor.receiveShadow = true;
+        houseGroup.add(bathFloor);
+
+        // --- 4 MURI ESTERNI IN LEGNO SCURO CON DYNAMIC WALL CULLING ---
+        const outerWalls = [];
+        function createDynamicOuterWall(w, h, d, x, z, normalVec) {
+            const mat = new THREE.MeshStandardMaterial({
+                color: 0x3b2314,
+                roughness: 0.8,
+                transparent: true,
+                opacity: 1.0
+            });
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+            mesh.position.set(x, h / 2 + 0.15, z);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+
+            const trimMat = new THREE.MeshStandardMaterial({ color: 0x26150b, transparent: true, opacity: 1.0 });
+            const topBeam = new THREE.Mesh(new THREE.BoxGeometry(w + 0.1, 0.32, d + 0.1), trimMat);
+            topBeam.position.y = h / 2;
+            mesh.add(topBeam);
+
+            houseGroup.add(mesh);
+            outerWalls.push({ mesh, mat, trimMat, normal: normalVec.clone().normalize() });
+            return mesh;
+        }
+
+        const wallNorth = createDynamicOuterWall(HOUSE_W, WALL_H, 0.45, 0, -HOUSE_D / 2, new THREE.Vector3(0, 0, -1));
+        const wallSouth = createDynamicOuterWall(HOUSE_W, WALL_H, 0.45, 0, HOUSE_D / 2, new THREE.Vector3(0, 0, 1));
+        const wallWest  = createDynamicOuterWall(0.45, WALL_H, HOUSE_D, -HOUSE_W / 2, 0, new THREE.Vector3(-1, 0, 0));
+        const wallEast  = createDynamicOuterWall(0.45, WALL_H, HOUSE_D, HOUSE_W / 2, 0, new THREE.Vector3(1, 0, 0));
+
+        // Quadri romantici appesi alle pareti
+        function addWallPainting(parentWall, x, y, z, rotY) {
+            const frame = new THREE.Mesh(
+                new THREE.BoxGeometry(2.2, 1.5, 0.12),
+                new THREE.MeshStandardMaterial({ color: 0xfbcfe8 })
+            );
+            frame.position.set(x, y, z);
+            frame.rotation.y = rotY;
+            const heart = new THREE.Mesh(
+                new THREE.BoxGeometry(0.7, 0.7, 0.16),
+                new THREE.MeshStandardMaterial({ color: 0xf43f5e })
+            );
+            frame.add(heart);
+            parentWall.add(frame);
+        }
+        addWallPainting(wallNorth, -5.5, 0.5, 0.26, 0);
+        addWallPainting(wallNorth, 5.5, 0.5, 0.26, 0);
+        addWallPainting(wallWest, 0.26, 0.5, 4.5, Math.PI / 2);
+
+        // Divisori interni ribassati in legno scuro
+        const innerWallMat = new THREE.MeshStandardMaterial({ color: 0x4a2c18, roughness: 0.8 });
+        function addInnerWall(w, h, d, x, z) {
+            const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), innerWallMat);
+            m.position.set(x, h / 2 + 0.3, z);
+            m.castShadow = true;
+            m.receiveShadow = true;
+            houseGroup.add(m);
+        }
+        addInnerWall(0.35, 2.4, 6.8, 0, -6.1);
+        addInnerWall(0.35, 2.4, 6.8, 0, 6.1);
+        addInnerWall(8.2, 2.4, 0.35, -6.9, 0);
+        addInnerWall(8.2, 2.4, 0.35, 6.9, 0);
+
+        // ============================================================================
+        // 4. ARREDI DELLE 4 STANZE + POSTAZIONE PC GAMING + 5 CIBI DOPPI
+        // ============================================================================
+
+        // --- A) CUCINA CON SEDIE VICINE E 5 CIBI DOPPI (Nord-Ovest) ---
+        const counterMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.4 });
+        const woodTopMat = new THREE.MeshStandardMaterial({ color: 0xb47b48, roughness: 0.6 });
+
+        const counter = new THREE.Mesh(new THREE.BoxGeometry(6.5, 1.5, 1.5), counterMat);
+        counter.position.set(-6.8, 1.05, -8.3);
+        counter.castShadow = true;
+        const counterTop = new THREE.Mesh(new THREE.BoxGeometry(6.7, 0.18, 1.65), woodTopMat);
+        counterTop.position.set(-6.8, 1.85, -8.3);
+        const fridge = new THREE.Mesh(new THREE.BoxGeometry(1.7, 3.6, 1.6), new THREE.MeshStandardMaterial({ color: 0xfef08a, roughness: 0.3 }));
+        fridge.position.set(-2.3, 2.1, -8.2);
+        fridge.castShadow = true;
+        houseGroup.add(counter, counterTop, fridge);
+
+        // Tavolo da pranzo cucina
+        const kitchenTable = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.2, 2.3), woodTopMat);
+        kitchenTable.position.set(-5.5, 1.5, -4.2);
+        kitchenTable.castShadow = true;
+        houseGroup.add(kitchenTable);
+
+        [[-1.6, -0.9], [1.6, -0.9], [-1.6, 0.9], [1.6, 0.9]].forEach(([lx, lz]) => {
+            const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 1.25), innerWallMat);
+            leg.position.set(-5.5 + lx, 0.9, -4.2 + lz);
+            houseGroup.add(leg);
+        });
+
+        // 2 Sedie vicine al tavolo della cucina
+        function createKitchenChair(x, z, colorHex) {
+            const chair = new THREE.Group();
+            const seat = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.15, 1.05), new THREE.MeshStandardMaterial({ color: colorHex }));
+            seat.position.y = 0.9;
+            const back = new THREE.Mesh(new THREE.BoxGeometry(1.05, 1.05, 0.15), new THREE.MeshStandardMaterial({ color: colorHex }));
+            back.position.set(0, 1.45, -0.45);
+            chair.add(seat, back);
+            [[-0.4, -0.4], [0.4, -0.4], [-0.4, 0.4], [0.4, 0.4]].forEach(([cx, cz]) => {
+                const cLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.6), innerWallMat);
+                cLeg.position.set(cx, 0.6, cz);
+                chair.add(cLeg);
+            });
+            chair.position.set(x, 0, z);
+            houseGroup.add(chair);
+        }
+        createKitchenChair(-6.25, -5.55, 0xf472b6); // Sedia Laura
+        createKitchenChair(-4.75, -5.55, 0x60a5fa); // Sedia Mio baby♡
+
+        // Generatore dei 5 Cibi in Doppia Porzione Moderata
+        const foodSpawnGroup = new THREE.Group();
+        scene.add(foodSpawnGroup);
+
+        function buildSinglePortion(type) {
+            const item = new THREE.Group();
+            const plate = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.52, 0.40, 0.07, 14),
+                new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 })
+            );
+            item.add(plate);
+
+            if (type === 'cake') {
+                // 1. Torta al cioccolato
+                const base = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.28, 12), new THREE.MeshStandardMaterial({ color: 0x4a2511 }));
+                base.position.y = 0.18;
+                const icing = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.07, 12), new THREE.MeshStandardMaterial({ color: 0x2b1204 }));
+                icing.position.y = 0.32;
+                const cherry = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), new THREE.MeshStandardMaterial({ color: 0xe11d48 }));
+                cherry.position.y = 0.40;
+                item.add(base, icing, cherry);
+            } else if (type === 'hotdog') {
+                // 2. Hotdog
+                const bun = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.20, 0.30), new THREE.MeshStandardMaterial({ color: 0xd97706 }));
+                bun.position.y = 0.14;
+                const sausage = new THREE.Mesh(new THREE.BoxGeometry(0.70, 0.14, 0.15), new THREE.MeshStandardMaterial({ color: 0x991b1b }));
+                sausage.position.y = 0.20;
+                const mustard = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.04, 0.05), new THREE.MeshStandardMaterial({ color: 0xfacc15 }));
+                mustard.position.y = 0.28;
+                item.add(bun, sausage, mustard);
+            } else if (type === 'burger') {
+                // 3. Hamburger
+                const botBun = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.30, 0.09, 12), new THREE.MeshStandardMaterial({ color: 0xd99b4e }));
+                botBun.position.y = 0.08;
+                const lettuce = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.04, 10), new THREE.MeshStandardMaterial({ color: 0x4cd137 }));
+                lettuce.position.y = 0.14;
+                const patty = new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.33, 0.09, 12), new THREE.MeshStandardMaterial({ color: 0x592816 }));
+                patty.position.y = 0.20;
+                const cheese = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.03, 0.48), new THREE.MeshStandardMaterial({ color: 0xffbe0b }));
+                cheese.position.y = 0.25;
+                const topBun = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xd99b4e }));
+                topBun.position.y = 0.26;
+                item.add(botBun, lettuce, patty, cheese, topBun);
+            } else if (type === 'pasta') {
+                // 4. Pasta al ragù
+                const pastaMound = new THREE.Mesh(new THREE.SphereGeometry(0.34, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xfde047 }));
+                pastaMound.position.y = 0.04;
+                const ragu = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xb91c1c }));
+                ragu.position.y = 0.16;
+                item.add(pastaMound, ragu);
+            } else if (type === 'taro') {
+                // 5. Bubble Tea al Taro (Viola con perle di tapioca e cannuccia)
+                const cup = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.22, 0.17, 0.54, 12),
+                    new THREE.MeshStandardMaterial({ color: 0xa855f7, roughness: 0.2, transparent: true, opacity: 0.92 })
+                );
+                cup.position.y = 0.30;
+                item.add(cup);
+                for (let b = 0; b < 6; b++) {
+                    const pearl = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 6), new THREE.MeshBasicMaterial({ color: 0x111111 }));
+                    const ang = (b / 6) * Math.PI * 2;
+                    pearl.position.set(Math.cos(ang) * 0.09, 0.11, Math.sin(ang) * 0.09);
+                    item.add(pearl);
+                }
+                const straw = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.68, 8), new THREE.MeshStandardMaterial({ color: 0xf43f5e }));
+                straw.position.set(0.05, 0.45, 0);
+                straw.rotation.z = -0.18;
+                item.add(straw);
+            }
+            return item;
+        }
+
+        const FOOD_MENU = [
+            { id: 'cake', label: '🍰 Torta al Cioccolato (x2)' },
+            { id: 'hotdog', label: '🌭 Hotdog Caldi (x2)' },
+            { id: 'burger', label: '🍔 Hamburger (x2)' },
+            { id: 'pasta', label: '🍝 Pasta al Ragù (x2)' },
+            { id: 'taro', label: '🧋 Bubble Tea al Taro Viola (x2)' }
+        ];
+        let lastFoodIdx = -1;
+
+        function spawnKitchenMeal() {
+            while (foodSpawnGroup.children.length > 0) {
+                foodSpawnGroup.remove(foodSpawnGroup.children[0]);
+            }
+            let idx = Math.floor(Math.random() * FOOD_MENU.length);
+            if (idx === lastFoodIdx) idx = (idx + 1) % FOOD_MENU.length;
+            lastFoodIdx = idx;
+
+            const chosen = FOOD_MENU[idx];
+            const p1 = buildSinglePortion(chosen.id);
+            p1.position.set(-6.25, 1.64, -4.35);
+            const p2 = buildSinglePortion(chosen.id);
+            p2.position.set(-4.75, 1.64, -4.35);
+            foodSpawnGroup.add(p1, p2);
+            return chosen.label;
+        }
+        spawnKitchenMeal();
+
+        // --- B) SALOTTO CON DIVANO E TV (Sud-Ovest) ---
+        const livingRug = new THREE.Mesh(
+            new THREE.BoxGeometry(6.2, 0.06, 4.4),
+            new THREE.MeshStandardMaterial({ color: 0xfde68a, roughness: 0.9 })
+        );
+        livingRug.position.set(-5.5, 0.33, 5.2);
+        houseGroup.add(livingRug);
+
+        const sofaMat = new THREE.MeshStandardMaterial({ color: 0xe11d48, roughness: 0.7 });
+        const sofaGroup = new THREE.Group();
+        const sofaSeat = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.55, 1.6), sofaMat);
+        sofaSeat.position.y = 0.65;
+        const sofaBack = new THREE.Mesh(new THREE.BoxGeometry(4.2, 1.35, 0.45), sofaMat);
+        sofaBack.position.set(0, 1.2, -0.6);
+        const armL = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.95, 1.6), sofaMat);
+        armL.position.set(-1.95, 0.9, 0);
+        const armR = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.95, 1.6), sofaMat);
+        armR.position.set(1.95, 0.9, 0);
+        sofaGroup.add(sofaSeat, sofaBack, armL, armR);
+        sofaGroup.position.set(-5.5, 0, 3.6);
+        houseGroup.add(sofaGroup);
+
+        const tvStand = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.85, 1.0), innerWallMat);
+        tvStand.position.set(-5.5, 0.72, 8.3);
+        const tvFrame = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.85, 0.18), new THREE.MeshStandardMaterial({ color: 0x0f172a }));
+        tvFrame.position.set(-5.5, 2.15, 8.3);
+        const tvScreenMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, emissive: 0x000000, roughness: 0.2 });
+        const tvScreen = new THREE.Mesh(new THREE.BoxGeometry(2.95, 1.62, 0.05), tvScreenMat);
+        tvScreen.position.set(-5.5, 2.15, 8.19);
+        houseGroup.add(tvStand, tvFrame, tvScreen);
+
+        // --- C) CAMERA DA LETTO + POSTAZIONE PC GAMING RGB (Nord-Est) ---
+        const bedGroup = new THREE.Group();
+        const bedFrame = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.65, 4.6), innerWallMat);
+        bedFrame.position.y = 0.62;
+        const mattress = new THREE.Mesh(new THREE.BoxGeometry(3.9, 0.45, 4.3), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+        mattress.position.y = 1.05;
+        const blanket = new THREE.Mesh(new THREE.BoxGeometry(3.96, 0.48, 2.9), new THREE.MeshStandardMaterial({ color: 0xf472b6 }));
+        blanket.position.set(0, 1.06, 0.72);
+        const headboard = new THREE.Mesh(new THREE.BoxGeometry(4.2, 2.1, 0.35), innerWallMat);
+        headboard.position.set(0, 1.4, -2.15);
+        [-0.95, 0.95].forEach(px => {
+            const pillow = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.25, 0.85), new THREE.MeshStandardMaterial({ color: 0xfff1f2 }));
+            pillow.position.set(px, 1.35, -1.4);
+            bedGroup.add(pillow);
+        });
+        bedGroup.add(bedFrame, mattress, blanket, headboard);
+        bedGroup.position.set(4.5, 0, -6.5);
+        houseGroup.add(bedGroup);
+
+        // Postazione PC Gaming Completa
+        const pcDeskGroup = new THREE.Group();
+        const deskTop = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.14, 3.2), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
+        deskTop.position.set(0, 1.55, 0);
+        const deskLed = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 3.15), new THREE.MeshBasicMaterial({ color: 0x00ffcc }));
+        deskLed.position.set(0.78, 1.56, 0);
+        pcDeskGroup.add(deskTop, deskLed);
+
+        [[-0.65, -1.4], [0.65, -1.4], [-0.65, 1.4], [0.65, 1.4]].forEach(([dx, dz]) => {
+            const dLeg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.25, 0.12), new THREE.MeshStandardMaterial({ color: 0x0f172a }));
+            dLeg.position.set(dx, 0.9, dz);
+            pcDeskGroup.add(dLeg);
+        });
+
+        const monStand = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.5, 0.35), new THREE.MeshStandardMaterial({ color: 0x0f172a }));
+        monStand.position.set(0.35, 1.8, 0);
+        const monFrame = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.05, 1.95), new THREE.MeshStandardMaterial({ color: 0x0f172a }));
+        monFrame.position.set(0.25, 2.25, 0);
+        const monScreenMat = new THREE.MeshBasicMaterial({ color: 0x7b2cbf });
+        const monScreen = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.92, 1.82), monScreenMat);
+        monScreen.position.set(0.18, 2.25, 0);
+        pcDeskGroup.add(monStand, monFrame, monScreen);
+
+        const pcTower = new THREE.Mesh(new THREE.BoxGeometry(0.95, 1.15, 0.52), new THREE.MeshStandardMaterial({ color: 0x0f172a }));
+        pcTower.position.set(0.1, 2.18, -1.22);
+        const pcRgbStrip = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.95, 0.55), new THREE.MeshBasicMaterial({ color: 0xff007f }));
+        pcRgbStrip.position.set(0.08, 2.18, -1.22);
+        const keyboard = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.05, 0.95), new THREE.MeshBasicMaterial({ color: 0x00f5d4 }));
+        keyboard.position.set(-0.35, 1.65, 0.1);
+        pcDeskGroup.add(pcTower, pcRgbStrip, keyboard);
+
+        const gChair = new THREE.Group();
+        const gSeat = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.15, 1.0), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
+        gSeat.position.y = 0.92;
+        const gBack = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.45, 0.95), new THREE.MeshStandardMaterial({ color: 0xec4899 }));
+        gBack.position.set(-0.45, 1.6, 0);
+        const gPedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.35, 0.65, 8), new THREE.MeshStandardMaterial({ color: 0x0f172a }));
+        gPedestal.position.y = 0.6;
+        gChair.add(gSeat, gBack, gPedestal);
+        gChair.position.set(-1.1, 0, 0);
+        pcDeskGroup.add(gChair);
+
+        pcDeskGroup.position.set(9.2, 0, -2.2);
+        houseGroup.add(pcDeskGroup);
+
+        // --- D) BAGNO (Sud-Est) ---
+        const ceramicMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.15 });
+        const bathtub = new THREE.Mesh(new THREE.BoxGeometry(3.6, 1.1, 2.0), ceramicMat);
+        bathtub.position.set(7.8, 0.85, 7.6);
+        const waterInside = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.1, 1.6), new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.1 }));
+        waterInside.position.set(7.8, 1.38, 7.6);
+        const toilet = new THREE.Mesh(new THREE.BoxGeometry(0.95, 1.0, 1.2), ceramicMat);
+        toilet.position.set(3.2, 0.8, 8.1);
+        const sink = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.4, 1.0), ceramicMat);
+        sink.position.set(9.6, 1.0, 3.5);
+        houseGroup.add(bathtub, waterInside, toilet, sink);
+
+        // ============================================================================
+        // 5. PERSONAGGI PROCEDURALI: LAURA & MIO BABY♡ + NEVE & PEPE
+        // ============================================================================
+        const interactableMeshes = [];
+
+        function generateFaceTexture(isLaura, mood = 'happy') {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = '#ffe2c8';
+            ctx.fillRect(0, 0, 256, 256);
+
+            ctx.fillStyle = (mood === 'kiss') ? 'rgba(255, 90, 130, 0.65)' : 'rgba(255, 135, 155, 0.45)';
+            ctx.beginPath(); ctx.arc(58, 155, 26, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(198, 155, 26, 0, Math.PI * 2); ctx.fill();
+
+            ctx.strokeStyle = '#2b1b12';
+            ctx.fillStyle = '#2b1b12';
+            ctx.lineCap = 'round';
+
+            if (mood === 'sleep' || mood === 'kiss') {
+                ctx.lineWidth = 8;
+                ctx.beginPath(); ctx.arc(82, 118, 18, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+                ctx.beginPath(); ctx.arc(174, 118, 18, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+            } else {
+                ctx.beginPath(); ctx.arc(82, 118, 16, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(174, 118, 16, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath(); ctx.arc(76, 112, 6, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(168, 112, 6, 0, Math.PI * 2); ctx.fill();
+
+                if (isLaura) {
+                    ctx.strokeStyle = '#2b1b12';
+                    ctx.lineWidth = 6;
+                    ctx.beginPath(); ctx.moveTo(62, 106); ctx.lineTo(52, 98); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(194, 106); ctx.lineTo(204, 98); ctx.stroke();
+                }
+            }
+
+            ctx.strokeStyle = '#c94a5e';
+            ctx.lineWidth = 8;
+            if (mood === 'kiss') {
+                ctx.fillStyle = '#e11d48';
+                ctx.beginPath(); ctx.arc(128, 178, 13, 0, Math.PI * 2); ctx.fill();
+            } else {
+                ctx.beginPath();
+                ctx.arc(128, 162, 26, 0.18 * Math.PI, 0.82 * Math.PI);
+                ctx.stroke();
+            }
+
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.needsUpdate = true;
+            return tex;
+        }
+
+        function createRobloxCharacter(isLaura) {
+            const charGroup = new THREE.Group();
+            const scaleY = isLaura ? 1.0 : 1.09;
+
+            const skinMat = new THREE.MeshStandardMaterial({ color: 0xffe2c8, roughness: 0.6 });
+            const topMat = new THREE.MeshStandardMaterial({ color: isLaura ? 0xf472b6 : 0x2563eb, roughness: 0.6 });
+            const pantsMat = new THREE.MeshStandardMaterial({ color: isLaura ? 0x60a5fa : 0x1e293b, roughness: 0.7 });
+
+            const faces = {
+                happy: generateFaceTexture(isLaura, 'happy'),
+                kiss: generateFaceTexture(isLaura, 'kiss'),
+                sleep: generateFaceTexture(isLaura, 'sleep')
+            };
+
+            const bodyPivot = new THREE.Group();
+            bodyPivot.position.y = 1.15;
+            charGroup.add(bodyPivot);
+
+            const torso = new THREE.Mesh(new THREE.BoxGeometry(0.92, 1.15, 0.52), topMat);
+            torso.position.y = 0.58;
+            torso.castShadow = true;
+            bodyPivot.add(torso);
+
+            const headMats = [
+                skinMat, skinMat, skinMat, skinMat,
+                new THREE.MeshStandardMaterial({ map: faces.happy, roughness: 0.5 }),
+                skinMat
+            ];
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.88, 0.88), headMats);
+            head.position.y = 1.62;
+            head.castShadow = true;
+            bodyPivot.add(head);
+
+            if (isLaura) {
+                // Laura: Capelli castano chiaro lunghi + frangia spoglia portata di lato
+                const hairMat = new THREE.MeshStandardMaterial({ color: 0xb5835a, roughness: 0.65 });
+                const topHair = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.28, 0.96), hairMat);
+                topHair.position.set(0, 0.42, -0.02);
+                const backHair = new THREE.Mesh(new THREE.BoxGeometry(0.96, 1.55, 0.32), hairMat);
+                backHair.position.set(0, -0.22, -0.38);
+                head.add(topHair, backHair);
+
+                [-0.45, 0.45].forEach(hx => {
+                    const sideLock = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.25, 0.65), hairMat);
+                    sideLock.position.set(hx, -0.1, -0.05);
+                    head.add(sideLock);
+                });
+
+                const sideBangs = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.32, 0.14), hairMat);
+                sideBangs.position.set(0.18, 0.25, 0.45);
+                sideBangs.rotation.z = -0.24;
+                const thinStrand = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.36, 0.12), hairMat);
+                thinStrand.position.set(-0.34, 0.2, 0.45);
+                thinStrand.rotation.z = 0.2;
+                head.add(sideBangs, thinStrand);
+            } else {
+                // Mio baby♡: Capelli biondi + Occhiali neri Ray-Ban Meta
+                const blondMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.55 });
+                const topHair = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.32, 0.96), blondMat);
+                topHair.position.set(0, 0.42, 0);
+                const tuft = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.24, 0.28), blondMat);
+                tuft.position.set(0, 0.34, 0.42);
+                tuft.rotation.z = 0.12;
+                head.add(topHair, tuft);
+
+                const metaMat = new THREE.MeshStandardMaterial({ color: 0x111318, roughness: 0.2, metalness: 0.6 });
+                const glassesGroup = new THREE.Group();
+                const frameL = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.26, 0.08), metaMat);
+                frameL.position.set(-0.22, 0.04, 0.46);
+                const frameR = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.26, 0.08), metaMat);
+                frameR.position.set(0.22, 0.04, 0.46);
+                const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.07, 0.08), metaMat);
+                bridge.position.set(0, 0.08, 0.46);
+                const metaCam = new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 6), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+                metaCam.position.set(0.35, 0.11, 0.5);
+                glassesGroup.add(frameL, frameR, bridge, metaCam);
+                head.add(glassesGroup);
+            }
+
+            const armL = new THREE.Group();
+            armL.position.set(-0.65, 1.05, 0);
+            const armLMesh = new THREE.Mesh(new THREE.BoxGeometry(0.34, 1.0, 0.34), skinMat);
+            armLMesh.position.y = -0.42;
+            armL.add(armLMesh);
+            bodyPivot.add(armL);
+
+            const armR = new THREE.Group();
+            armR.position.set(0.65, 1.05, 0);
+            const armRMesh = new THREE.Mesh(new THREE.BoxGeometry(0.34, 1.0, 0.34), skinMat);
+            armRMesh.position.y = -0.42;
+            armR.add(armRMesh);
+            bodyPivot.add(armR);
+
+            const legL = new THREE.Group();
+            legL.position.set(-0.24, 1.15, 0);
+            const legLMesh = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.0, 0.42), pantsMat);
+            legLMesh.position.y = -0.5;
+            legL.add(legLMesh);
+            charGroup.add(legL);
+
+            const legR = new THREE.Group();
+            legR.position.set(0.24, 1.15, 0);
+            const legRMesh = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.0, 0.42), pantsMat);
+            legRMesh.position.y = -0.5;
+            legR.add(legRMesh);
+            charGroup.add(legR);
+
+            charGroup.scale.set(1, scaleY, 1);
+
+            const charId = isLaura ? 'laura' : 'baby';
+            charGroup.traverse(ch => {
+                if (ch.isMesh) {
+                    ch.userData.characterId = charId;
+                    interactableMeshes.push(ch);
+                }
+            });
+
+            scene.add(charGroup);
+
+            return {
+                id: charId,
+                group: charGroup,
+                bodyPivot,
+                head,
+                armL, armR,
+                legL, legR,
+                faces,
+                targetPos: new THREE.Vector3(),
+                pose: 'stand',
+                setMood(m) {
+                    head.material[4].map = faces[m] || faces.happy;
+                    head.material[4].needsUpdate = true;
+                }
+            };
+        }
+
+        const laura = createRobloxCharacter(true);
+        laura.group.position.set(-1.4, 0.3, 1.5);
+        laura.targetPos.copy(laura.group.position);
+
+        const baby = createRobloxCharacter(false);
+        baby.group.position.set(1.4, 0.3, 1.5);
+        baby.targetPos.copy(baby.group.position);
+
+        // Animali Domestici: Neve (Gatto bianco) e Pepe (Cagnolino marrone)
+        function createPet(colorHex, isCat) {
+            const petGroup = new THREE.Group();
+            const mat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.7 });
+
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.42, 0.85), mat);
+            body.position.y = 0.42;
+            body.castShadow = true;
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.44, 0.46), mat);
+            head.position.set(0, 0.68, 0.42);
+            petGroup.add(body, head);
+
+            [-0.15, 0.15].forEach(ex => {
+                const ear = new THREE.Mesh(new THREE.BoxGeometry(0.12, isCat ? 0.18 : 0.14, 0.1), mat);
+                ear.position.set(ex, 0.94, 0.42);
+                petGroup.add(ear);
+            });
+
+            const tail = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.45), mat);
+            tail.position.set(0, 0.58, -0.5);
+            tail.rotation.x = 0.45;
+            petGroup.add(tail);
+
+            scene.add(petGroup);
+            return {
+                group: petGroup,
+                tail,
+                target: new THREE.Vector3((Math.random() - 0.5) * 14, 0.3, (Math.random() - 0.5) * 12),
+                waitTimer: 1 + Math.random() * 3
+            };
+        }
+
+        const neve = createPet(0xffffff, true);
+        neve.group.position.set(-3, 0.3, 2);
+
+        const pepe = createPet(0x7a4b2a, false);
+        pepe.group.position.set(3, 0.3, 2);
+
+        // ============================================================================
+        // 6. CUORICINI 3D & CODE DIALOGHI ANTI-RIPETIZIONE (Fisher-Yates)
+        // ============================================================================
+        const hearts = [];
+        const heartMat = new THREE.MeshBasicMaterial({ color: 0xff2a6d });
+
+        function spawnHeartParticle(pos, count = 1) {
+            for (let i = 0; i < count; i++) {
+                const h = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.28, 0.28), heartMat);
+                h.position.copy(pos);
+                h.position.x += (Math.random() - 0.5) * 1.1;
+                h.position.y += 2.3 + Math.random() * 0.6;
+                h.position.z += (Math.random() - 0.5) * 1.1;
+                h.rotation.set(Math.random(), Math.random(), Math.PI / 4);
+                scene.add(h);
+                hearts.push({ mesh: h, life: 1.4 });
+            }
+        }
+
+        class DialogueQueue {
+            constructor(lines) {
+                this.lines = lines;
+                this.pool = [];
+                this.lastPicked = null;
+            }
+            next() {
+                if (this.pool.length === 0) {
+                    this.pool = [...this.lines];
+                    for (let i = this.pool.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [this.pool[i], this.pool[j]] = [this.pool[j], this.pool[i]];
+                    }
+                    if (this.pool.length > 1 && this.pool[0] === this.lastPicked) {
+                        [this.pool[0], this.pool[1]] = [this.pool[1], this.pool[0]];
+                    }
+                }
+                const chosen = this.pool.shift();
+                this.lastPicked = chosen;
+                return chosen;
+            }
+        }
+
+        const kitchenDialogues = new DialogueQueue([
+            "Amore assaggia quanto è buono! 😍",
+            "È buonissimo, è buonissimo! 😋",
+            "L'ho cucinato per te♡",
+            "Ti amo tanto amore mio♡",
+            "Mangiare qui vicino a te è stupendo♡"
+        ]);
+
+        const livingDialogues = new DialogueQueue([
+            "Quanto è bello questo film! 🎬",
+            "Che bello questo film romantico♡",
+            "Fumiamo una J 🌿✨",
+            "Bello stare così sul divano con te♡"
+        ]);
+
+        const sleepDialogues = new DialogueQueue([
+            "Ti amo tanto♡",
+            "Sei la mia vita♡",
+            "Buonanotte mio baby♡",
+            "Stringimi forte tutta la notte♡"
+        ]);
+
+        const pcDialogues = new DialogueQueue([
+            "Che postazione PC assurda! 💻🔥",
+            "Guarda che bello questo monitor!",
+            "Giochiamo insieme amore♡"
+        ]);
+
+        let activeBubble = null;
+        const labelsContainer = document.getElementById('labels-container');
+
+        function showSpeechBubble(charObj, text, duration = 2700) {
+            if (activeBubble) {
+                activeBubble.el.remove();
+                activeBubble = null;
+            }
+            const el = document.createElement('div');
+            el.className = 'speech-bubble';
+            el.innerText = text;
+            labelsContainer.appendChild(el);
+            activeBubble = { el, charObj, expires: performance.now() + duration };
+        }
+
+        // ============================================================================
+        // 7. MENU CONTESTUALI, RAYCASTER TOUCH & LOGICA STATI
+        // ============================================================================
+        function openCharacterMenu(charId) {
+            document.getElementById('menu-laura').classList.add('hidden');
+            document.getElementById('menu-baby').classList.add('hidden');
+            if (charId === 'laura') {
+                document.getElementById('menu-laura').classList.remove('hidden');
+            } else {
+                document.getElementById('menu-baby').classList.remove('hidden');
+            }
+        }
+
+        function closeCharacterMenus() {
+            document.getElementById('menu-laura').classList.add('hidden');
+            document.getElementById('menu-baby').classList.add('hidden');
+        }
+
+        function setHUDStatus(icon, text) {
+            document.getElementById('status-icon').textContent = icon;
+            document.getElementById('status-text').textContent = text;
+        }
+
+        // Touch Raycaster per toccare Laura o Mio baby♡ in 3D
+        const raycaster = new THREE.Raycaster();
+        const pointer = new THREE.Vector2();
+        let downTime = 0;
+        let downPos = { x: 0, y: 0 };
+
+        renderer.domElement.addEventListener('pointerdown', (e) => {
+            downTime = performance.now();
+            downPos.x = e.clientX;
+            downPos.y = e.clientY;
+        });
+
+        renderer.domElement.addEventListener('pointerup', (e) => {
+            if (performance.now() - downTime < 300 && Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y) < 12) {
+                pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+                pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+                raycaster.setFromCamera(pointer, camera);
+                const hits = raycaster.intersectObjects(interactableMeshes, true);
+                if (hits.length > 0 && hits[0].object.userData.characterId) {
+                    openCharacterMenu(hits[0].object.userData.characterId);
+                } else {
+                    closeCharacterMenus();
+                }
+            }
+        });
+
+        let gameState = 'AFK';
+        let stateTimer = 0;
+        let dialogueTimer = 0;
+        let afkMoveTimer = 2;
+
+        function resetCharacterPoses() {
+            [laura, baby].forEach(c => {
+                c.pose = 'stand';
+                c.setMood('happy');
+                c.group.position.y = 0.3;
+                c.bodyPivot.position.set(0, 1.15, 0);
+                c.bodyPivot.rotation.set(0, 0, 0);
+                c.head.rotation.set(0, 0, 0);
+                c.armL.rotation.set(0, 0, 0);
+                c.armR.rotation.set(0, 0, 0);
+                c.legL.rotation.set(0, 0, 0);
+                c.legR.rotation.set(0, 0, 0);
+            });
+            tvScreenMat.emissive.setHex(0x000000);
+            tvLight.intensity = 0;
+            document.getElementById('censor-overlay').style.display = 'none';
+        }
+
+        window.startPersonalAction = function(actionType) {
+            closeCharacterMenus();
+            resetCharacterPoses();
+
+            const mid = laura.group.position.clone().add(baby.group.position).multiplyScalar(0.5);
+            mid.x = THREE.MathUtils.clamp(mid.x, -6, 6);
+            mid.z = THREE.MathUtils.clamp(mid.z, -4, 4);
+
+            if (actionType === 'bacia' || actionType === 'mangia') {
+                const isMangia = (actionType === 'mangia');
+                gameState = isMangia ? 'ACTION_MANGIA_APPROACH' : 'ACTION_KISS_APPROACH';
+                setHUDStatus(isMangia ? '🔥' : '💋', isMangia ? 'Mangia! Bacio lungo (3s) ♡' : 'Bacio sulle labbra (1s) ♡');
+                laura.targetPos.set(mid.x - 0.52, 0.3, mid.z);
+                baby.targetPos.set(mid.x + 0.52, 0.3, mid.z);
+            } else if (actionType === 'bacino') {
+                gameState = 'ACTION_BACINO_APPROACH';
+                setHUDStatus('🥰', 'Laura dà un bacino sulla guancia a Mio baby♡');
+                baby.targetPos.copy(baby.group.position);
+                laura.targetPos.set(baby.group.position.x - 0.68, 0.3, baby.group.position.z);
+            } else if (actionType === 'tuff') {
+                gameState = 'ACTION_TUFF';
+                stateTimer = 4.0;
+                setHUDStatus('🕺', 'Mio baby♡ fa la mossa di ballo Tuff!');
+                baby.pose = 'dance';
+                showSpeechBubble(laura, "Quanto sei Tuff amore mio! 🔥😍", 3000);
+            }
+        };
+
+        window.triggerRoom = function(room) {
+            closeCharacterMenus();
+            resetCharacterPoses();
+
+            if (room === 'afk') {
+                gameState = 'AFK';
+                setHUDStatus('💖', 'Vita Autonoma AFK ♡');
+                return;
+            }
+            if (room === 'kitchen') {
+                const mealName = spawnKitchenMeal();
+                gameState = 'ROOM_KITCHEN_WALK';
+                setHUDStatus('🍔', `A tavola: ${mealName}`);
+                laura.targetPos.set(-6.25, 0.3, -5.45);
+                baby.targetPos.set(-4.75, 0.3, -5.45);
+            } else if (room === 'living') {
+                gameState = 'ROOM_LIVING_WALK';
+                setHUDStatus('🛋️', 'Seduti vicini sul divano a guardare la TV ♡');
+                laura.targetPos.set(-6.2, 0.3, 3.7);
+                baby.targetPos.set(-4.8, 0.3, 3.7);
+            } else if (room === 'bedroom') {
+                gameState = 'ROOM_BEDROOM_WALK';
+                setHUDStatus('🛏️', 'Abbracciati a dormire in camera ♡');
+                laura.targetPos.set(3.8, 0.3, -6.2);
+                baby.targetPos.set(5.2, 0.3, -6.2);
+            } else if (room === 'bathroom') {
+                gameState = 'ROOM_BATH_WALK';
+                setHUDStatus('🚿', 'Andando in bagno...');
+                const chosen = Math.random() > 0.5 ? laura : baby;
+                chosen.targetPos.set(6.2, 0.3, 6.2);
+            } else if (room === 'pc') {
+                gameState = 'ROOM_PC_WALK';
+                setHUDStatus('💻', 'Alla postazione PC Gaming RGB!');
+                baby.targetPos.set(8.1, 0.3, -2.2);
+                laura.targetPos.set(7.2, 0.3, -1.0);
+            }
+        };
+
+        function moveCharacterTowards(charObj, dt, speed = 4.2) {
+            const pos = charObj.group.position;
+            const dx = charObj.targetPos.x - pos.x;
+            const dz = charObj.targetPos.z - pos.z;
+            const dist = Math.hypot(dx, dz);
+
+            if (dist > 0.12 && charObj.pose === 'stand') {
+                const step = Math.min(dist, speed * dt);
+                pos.x += (dx / dist) * step;
+                pos.z += (dz / dist) * step;
+                charObj.group.rotation.y = Math.atan2(dx, dz);
+
+                const t = performance.now() * 0.012;
+                charObj.legL.rotation.x = Math.sin(t) * 0.55;
+                charObj.legR.rotation.x = -Math.sin(t) * 0.55;
+                charObj.armL.rotation.x = -Math.sin(t) * 0.45;
+                charObj.armR.rotation.x = Math.sin(t) * 0.45;
+                return false;
+            } else {
+                if (charObj.pose === 'stand') {
+                    charObj.legL.rotation.x = 0;
+                    charObj.legR.rotation.x = 0;
+                    charObj.armL.rotation.x = 0;
+                    charObj.armR.rotation.x = 0;
+                }
+                return true;
+            }
+        }
+
+        function applySeatedPose(charObj, yRot) {
+            charObj.pose = 'sit';
+            charObj.group.rotation.y = yRot;
+            charObj.group.position.y = 0.05;
+            charObj.legL.rotation.x = -Math.PI / 2;
+            charObj.legR.rotation.x = -Math.PI / 2;
+        }
+
+        function updateBathroomCensorCanvas() {
+            const canvas = document.getElementById('censor-canvas');
+            const ctx = canvas.getContext('2d');
+            const colors = ['#7dd3fc', '#bae6fd', '#f9a8d4', '#fde68a', '#e2e8f0', '#38bdf8'];
+            for (let x = 0; x < canvas.width; x++) {
+                for (let y = 0; y < canvas.height; y++) {
+                    ctx.fillStyle = colors[Math.floor(Math.random() * colors.length)];
+                    ctx.fillRect(x, y, 1, 1);
+                }
+            }
+        }
+
+        // ============================================================================
+        // 8. CONTROLLO CICLO GIORNO/NOTTE E PROIEZIONE 2D
+        // ============================================================================
+        let gameHour = 11.0;
+        let autoTime = true;
+
+        function toggleAutoTime() {
+            autoTime = !autoTime;
+            const btn = document.getElementById('btn-auto-time');
+            btn.textContent = autoTime ? '⏱️ Auto: ON' : '⏱️ Auto: OFF';
+        }
+
+        function onManualTimeChange(val) {
+            gameHour = parseFloat(val);
+            if (autoTime) toggleAutoTime();
+        }
+
+        function updateDayNightCycle(dt) {
+            if (autoTime) {
+                gameHour = (gameHour + dt * 0.25) % 24;
+                document.getElementById('time-slider').value = gameHour;
+            }
+
+            let skyColor = new THREE.Color();
+            let timeText = '☀️ Giorno';
+            let warmInt = 0.15;
+
+            if (gameHour >= 5 && gameHour < 8) {
+                skyColor.setHex(0xffb4a2);
+                sunLight.intensity = 0.65;
+                ambientLight.intensity = 0.55;
+                warmInt = 0.5;
+                timeText = '🌅 Alba';
+            } else if (gameHour >= 8 && gameHour < 17.5) {
+                skyColor.setHex(0x87CEEB);
+                sunLight.intensity = 0.95;
+                ambientLight.intensity = 0.68;
+                warmInt = 0.1;
+                timeText = '☀️ Giorno';
+            } else if (gameHour >= 17.5 && gameHour < 20.5) {
+                skyColor.setHex(0xf97316);
+                sunLight.intensity = 0.65;
+                ambientLight.intensity = 0.48;
+                warmInt = 0.95;
+                timeText = '🌇 Tramonto';
+            } else {
+                skyColor.setHex(0x0f172a);
+                sunLight.intensity = 0.18;
+                ambientLight.intensity = 0.32;
+                warmInt = 1.25;
+                timeText = '🌙 Notte';
+            }
+
+            scene.background.lerp(skyColor, 0.08);
+            scene.fog.color.copy(scene.background);
+            houseLights.forEach(l => l.intensity = warmInt);
+
+            const angle = ((gameHour - 6) / 24) * Math.PI * 2;
+            sunLight.position.set(Math.cos(angle) * 42, Math.max(6, Math.sin(angle) * 45), 20);
+            document.getElementById('time-label').textContent = timeText;
+        }
+
+        function projectToScreen(vec3, yOffset = 0) {
+            const v = vec3.clone();
+            v.y += yOffset;
+            v.project(camera);
+            const x = (v.x * 0.5 + 0.5) * window.innerWidth;
+            const y = (-(v.y * 0.5) + 0.5) * window.innerHeight;
+            return { x, y, visible: v.z < 1 };
+        }
+
+        // ============================================================================
+        // 9. GAME LOOP PRINCIPALE
+        // ============================================================================
+        let lastTime = performance.now();
+
+        function animate(now) {
+            requestAnimationFrame(animate);
+            const dt = Math.min((now - lastTime) / 1000, 0.1);
+            lastTime = now;
+
+            controls.update();
+            updateDayNightCycle(dt);
+
+            // 1. Dynamic Wall Culling: abbassa l'opacità dei muri esterni che coprono la visuale
+            const camDir = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
+            outerWalls.forEach(w => {
+                const dot = w.normal.dot(camDir);
+                const shouldHide = dot > 0.12;
+                const targetOp = shouldHide ? 0.08 : 1.0;
+                w.mat.opacity += (targetOp - w.mat.opacity) * 0.16;
+                w.trimMat.opacity = w.mat.opacity;
+                w.mesh.children.forEach(ch => {
+                    if (ch !== w.mesh.children[0]) ch.visible = !shouldHide;
+                });
+            });
+
+            // 2. Effetto RGB Postazione PC Gaming
+            const hue = (now * 0.0003) % 1;
+            pcRgbLight.color.setHSL(hue, 0.9, 0.55);
+            monScreenMat.color.setHSL((hue + 0.3) % 1, 0.75, 0.48);
+
+            // 3. Macchina a Stati Personaggi
+            const lauraArrived = moveCharacterTowards(laura, dt);
+            const babyArrived  = moveCharacterTowards(baby, dt);
+
+            if (gameState === 'AFK') {
+                afkMoveTimer -= dt;
+                if (afkMoveTimer <= 0) {
+                    afkMoveTimer = 4 + Math.random() * 4;
+                    const waypoints = [
+                        new THREE.Vector3(-3, 0.3, -2),
+                        new THREE.Vector3(-4, 0.3, 2.2),
+                        new THREE.Vector3(2.5, 0.3, -2.5),
+                        new THREE.Vector3(0, 0.3, 1.5),
+                        new THREE.Vector3(-1.5, 0.3, 4)
+                    ];
+                    const wp = waypoints[Math.floor(Math.random() * waypoints.length)];
+                    laura.targetPos.copy(wp);
+                    baby.targetPos.set(wp.x + 1.35, 0.3, wp.z + (Math.random() - 0.5));
+                    if (Math.random() < 0.5) spawnHeartParticle(laura.group.position, 2);
+                }
+            }
+            else if (gameState === 'ACTION_KISS_APPROACH' || gameState === 'ACTION_MANGIA_APPROACH') {
+                if (lauraArrived && babyArrived) {
+                    const isMangia = (gameState === 'ACTION_MANGIA_APPROACH');
+                    gameState = 'ACTION_KISSING';
+                    stateTimer = isMangia ? 3.0 : 1.0;
+                    laura.group.rotation.y = Math.PI / 2;
+                    baby.group.rotation.y = -Math.PI / 2;
+                    laura.setMood('kiss');
+                    baby.setMood('kiss');
+                    laura.bodyPivot.rotation.x = 0.14;
+                    baby.bodyPivot.rotation.x = 0.14;
+                    spawnHeartParticle(laura.group.position, isMangia ? 8 : 4);
+                }
+            }
+            else if (gameState === 'ACTION_KISSING') {
+                stateTimer -= dt;
+                if (Math.random() < 0.28) spawnHeartParticle(laura.group.position, 1);
+                if (stateTimer <= 0) {
+                    resetCharacterPoses();
+                    gameState = 'AFK';
+                    setHUDStatus('💖', 'Vita Autonoma AFK ♡');
+                }
+            }
+            else if (gameState === 'ACTION_BACINO_APPROACH') {
+                if (lauraArrived && babyArrived) {
+                    gameState = 'ACTION_BACINO_HOLD';
+                    stateTimer = 1.6;
+                    baby.group.rotation.y = 0;
+                    baby.setMood('happy');
+                    laura.group.rotation.y = Math.PI / 2;
+                    laura.setMood('kiss');
+                    laura.head.rotation.x = 0.24;
+                    spawnHeartParticle(baby.group.position, 4);
+                    showSpeechBubble(baby, "Che dolce la mia Laura♡", 2200);
+                }
+            }
+            else if (gameState === 'ACTION_BACINO_HOLD') {
+                stateTimer -= dt;
+                if (stateTimer <= 0) {
+                    resetCharacterPoses();
+                    gameState = 'AFK';
+                    setHUDStatus('💖', 'Vita Autonoma AFK ♡');
+                }
+            }
+            else if (gameState === 'ACTION_TUFF') {
+                stateTimer -= dt;
+                const t = now * 0.018;
+                baby.group.rotation.y += dt * 4.8;
+                baby.bodyPivot.position.y = 1.15 + Math.abs(Math.sin(t)) * 0.25;
+                baby.armL.rotation.z = Math.sin(t) * 1.2 + 0.6;
+                baby.armR.rotation.z = -Math.cos(t) * 1.2 - 0.6;
+                baby.legL.rotation.x = Math.sin(t * 1.5) * 0.5;
+                baby.legR.rotation.x = -Math.sin(t * 1.5) * 0.5;
+                laura.group.lookAt(baby.group.position.x, laura.group.position.y, baby.group.position.z);
+                if (stateTimer <= 0) {
+                    resetCharacterPoses();
+                    gameState = 'AFK';
+                    setHUDStatus('💖', 'Vita Autonoma AFK ♡');
+                }
+            }
+            else if (gameState === 'ROOM_KITCHEN_WALK') {
+                if (lauraArrived && babyArrived) {
+                    gameState = 'ROOM_KITCHEN_EAT';
+                    applySeatedPose(laura, 0);
+                    applySeatedPose(baby, 0);
+                    dialogueTimer = 0.4;
+                }
+            }
+            else if (gameState === 'ROOM_KITCHEN_EAT') {
+                const eatWave = Math.sin(now * 0.008) * 0.35 - 0.55;
+                laura.armR.rotation.x = eatWave;
+                baby.armR.rotation.x = eatWave;
+                dialogueTimer -= dt;
+                if (dialogueTimer <= 0) {
+                    dialogueTimer = 3.2;
+                    const speaker = Math.random() > 0.5 ? laura : baby;
+                    showSpeechBubble(speaker, kitchenDialogues.next(), 2800);
+                    spawnHeartParticle(speaker.group.position, 2);
+                }
+            }
+            else if (gameState === 'ROOM_LIVING_WALK') {
+                if (lauraArrived && babyArrived) {
+                    gameState = 'ROOM_LIVING_CHILL';
+                    applySeatedPose(laura, 0);
+                    applySeatedPose(baby, 0);
+                    tvLight.intensity = 1.25;
+                    dialogueTimer = 0.4;
+                }
+            }
+            else if (gameState === 'ROOM_LIVING_CHILL') {
+                tvScreenMat.emissive.setHSL((now * 0.0005) % 1, 0.8, 0.45);
+                dialogueTimer -= dt;
+                if (dialogueTimer <= 0) {
+                    dialogueTimer = 3.3;
+                    const speaker = Math.random() > 0.5 ? laura : baby;
+                    showSpeechBubble(speaker, livingDialogues.next(), 2800);
+                    spawnHeartParticle(speaker.group.position, 2);
+                }
+            }
+            else if (gameState === 'ROOM_BEDROOM_WALK') {
+                if (lauraArrived && babyArrived) {
+                    gameState = 'ROOM_BEDROOM_SLEEP';
+                    laura.pose = 'sleep';
+                    baby.pose = 'sleep';
+                    laura.setMood('sleep');
+                    baby.setMood('sleep');
+                    laura.group.position.set(4.05, 1.35, -6.2);
+                    baby.group.position.set(4.95, 1.35, -6.2);
+                    laura.group.rotation.set(0, 0, 0);
+                    baby.group.rotation.set(0, 0, 0);
+                    laura.bodyPivot.rotation.x = -Math.PI / 2;
+                    baby.bodyPivot.rotation.x = -Math.PI / 2;
+                    laura.legL.rotation.x = -Math.PI / 2;
+                    laura.legR.rotation.x = -Math.PI / 2;
+                    baby.legL.rotation.x = -Math.PI / 2;
+                    baby.legR.rotation.x = -Math.PI / 2;
+                    laura.armR.rotation.z = -0.65;
+                    baby.armL.rotation.z = 0.65;
+                    dialogueTimer = 0.4;
+                }
+            }
+            else if (gameState === 'ROOM_BEDROOM_SLEEP') {
+                dialogueTimer -= dt;
+                if (dialogueTimer <= 0) {
+                    dialogueTimer = 3.2;
+                    const speaker = Math.random() > 0.5 ? laura : baby;
+                    showSpeechBubble(speaker, sleepDialogues.next(), 2700);
+                    spawnHeartParticle(speaker.group.position, 2);
+                }
+            }
+            else if (gameState === 'ROOM_BATH_WALK') {
+                if (lauraArrived && babyArrived) {
+                    gameState = 'ROOM_BATH_CENSOR';
+                    stateTimer = 3.0;
+                    document.getElementById('censor-overlay').style.display = 'block';
+                    setHUDStatus('🙈', 'Bagno Pixelato per 3 secondi!');
+                }
+            }
+            else if (gameState === 'ROOM_BATH_CENSOR') {
+                stateTimer -= dt;
+                updateBathroomCensorCanvas();
+                const bathCenter = new THREE.Vector3(6.2, 1.8, 6.2);
+                const sp = projectToScreen(bathCenter, 0);
+                const censorEl = document.getElementById('censor-overlay');
+                censorEl.style.left = `${sp.x}px`;
+                censorEl.style.top = `${sp.y}px`;
+
+                if (stateTimer <= 0) {
+                    censorEl.style.display = 'none';
+                    resetCharacterPoses();
+                    gameState = 'AFK';
+                    setHUDStatus('💖', 'Vita Autonoma AFK ♡');
+                }
+            }
+            else if (gameState === 'ROOM_PC_WALK') {
+                if (lauraArrived && babyArrived) {
+                    gameState = 'ROOM_PC_PLAY';
+                    applySeatedPose(baby, Math.PI / 2);
+                    laura.group.lookAt(9.2, laura.group.position.y, -2.2);
+                    dialogueTimer = 0.4;
+                }
+            }
+            else if (gameState === 'ROOM_PC_PLAY') {
+                dialogueTimer -= dt;
+                if (dialogueTimer <= 0) {
+                    dialogueTimer = 3.2;
+                    const speaker = Math.random() > 0.5 ? laura : baby;
+                    showSpeechBubble(speaker, pcDialogues.next(), 2700);
+                }
+            }
+
+            // 4. Animali domestici Neve e Pepe
+            [neve, pepe].forEach(pet => {
+                const pPos = pet.group.position;
+                const dx = pet.target.x - pPos.x;
+                const dz = pet.target.z - pPos.z;
+                const dist = Math.hypot(dx, dz);
+                pet.tail.rotation.z = Math.sin(now * 0.015) * 0.45;
+
+                if (dist > 0.2) {
+                    pPos.x += (dx / dist) * 2.2 * dt;
+                    pPos.z += (dz / dist) * 2.2 * dt;
+                    pet.group.rotation.y = Math.atan2(dx, dz);
+                    pPos.y = 0.3 + Math.abs(Math.sin(now * 0.018)) * 0.11;
+                } else {
+                    pPos.y = 0.3;
+                    pet.waitTimer -= dt;
+                    if (pet.waitTimer <= 0) {
+                        pet.waitTimer = 2 + Math.random() * 4;
+                        pet.target.set((Math.random() - 0.5) * 16, 0.3, (Math.random() - 0.5) * 14);
+                    }
+                }
+            });
+
+            // 5. Particelle Cuoricini 3D
+            for (let i = hearts.length - 1; i >= 0; i--) {
+                const h = hearts[i];
+                h.life -= dt;
+                h.mesh.position.y += dt * 1.4;
+                h.mesh.rotation.y += dt * 3;
+                h.mesh.scale.setScalar(Math.max(0, h.life / 1.4));
+                if (h.life <= 0) {
+                    scene.remove(h.mesh);
+                    hearts.splice(i, 1);
+                }
+            }
+
+            // 6. Proiezione Targhette Nomi e Fumetti
+            const labelsMap = [
+                { id: 'label-laura', pos: laura.group.position, y: 3.5 },
+                { id: 'label-baby', pos: baby.group.position, y: 3.7 },
+                { id: 'label-neve', pos: neve.group.position, y: 1.4 },
+                { id: 'label-pepe', pos: pepe.group.position, y: 1.4 },
+                { id: 'label-f15', pos: f15Jet.position, y: 5.8 }
+            ];
+            labelsMap.forEach(item => {
+                const el = document.getElementById(item.id);
+                const sp = projectToScreen(item.pos, item.y);
+                el.style.display = sp.visible ? 'block' : 'none';
+                el.style.left = `${sp.x}px`;
+                el.style.top = `${sp.y}px`;
+            });
+
+            if (activeBubble) {
+                if (now > activeBubble.expires) {
+                    activeBubble.el.remove();
+                    activeBubble = null;
+                } else {
+                    const sp = projectToScreen(activeBubble.charObj.group.position, 4.3);
+                    activeBubble.el.style.left = `${sp.x}px`;
+                    activeBubble.el.style.top = `${sp.y}px`;
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        window.onload = function() {
+            requestAnimationFrame(animate);
+        };
+    </script>
+</body>
+</html>
